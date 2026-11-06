@@ -17,6 +17,7 @@ import threading
 from pathlib import Path
 
 from .long_memory import now
+from .episode_memory import local_iso, utc_iso
 
 
 @dataclass
@@ -192,6 +193,73 @@ def _cos(a,b):
     return sum(x*y for x,y in zip(a,b)) / max(1e-9, math.sqrt(sum(x*x for x in a))*math.sqrt(sum(y*y for y in b)))
 
 
+def _trusted_time(value):
+    """Parse an offset-aware timestamp only; never guess a timezone."""
+    return utc_iso(value)
+
+
+def _time_span(start, end):
+    """Source timestamp range rendered in Beijing time, or None if unknown.
+
+    This refers to the recorded conversation, NOT necessarily when a fact
+    became true or when an event occurred in the fictional/game world.
+    """
+    times = sorted({t for t in (_trusted_time(start), _trusted_time(end)) if t})
+    if not times:
+        return None
+    labels = [local_iso(t) for t in (times[0], times[-1])]
+    return labels[0] if labels[0] == labels[1] else labels[0] + ' ～ ' + labels[1]
+
+
+def _memory_time_label(entry):
+    """Use evidence time first. Archive creation is explicitly not event time."""
+    span = _time_span(entry.get('time_start'), entry.get('time_end'))
+    if span:
+        return '来源对话时间（北京时间）：' + span
+    recorded = local_iso(entry.get('recorded_at'))
+    if recorded:
+        return '仅知收录时间（非事件发生时间，北京时间）：' + recorded
+    return '时间未知'
+
+
+def _source_time_ranges(con):
+    """Recover timestamps from original cited messages, not archive creation.
+
+    Multiple Cand can refer to the same extraction batch. Decode its saved
+    input only once; retrieval must remain affordable with a large archive.
+    """
+    rows=con.execute('''SELECT m.id, m.evidence_ids, m.event_time, a.run_id
+        FROM memories m
+        LEFT JOIN candidate_audit a ON a.candidate_id=m.origin_candidate_id
+        WHERE m.status='active' AND a.run_id IS NOT NULL''').fetchall()
+    eligible=[r for r in rows if not _trusted_time(r['event_time'])]
+    run_ids=sorted({r['run_id'] for r in eligible})
+    index={}
+    for pos in range(0,len(run_ids),300):
+        group=run_ids[pos:pos+300]
+        if not group:
+            continue
+        placeholders=','.join('?' for _ in group)
+        for run in con.execute(f'SELECT id,input_payload FROM extraction_runs WHERE id IN ({placeholders})',group):
+            try:
+                records=json.loads(run['input_payload']).get('messages',[])
+                index[run['id']]={item.get('id'):_trusted_time(item.get('event_time') or item.get('created_at'))
+                                  for item in records if isinstance(item,dict)}
+            except (TypeError, ValueError, AttributeError):
+                continue
+    result={}
+    for r in eligible:
+        try:
+            ids=json.loads(r['evidence_ids'])
+            recorded=index.get(r['run_id'],{})
+            times=sorted({recorded[i] for i in ids if recorded.get(i)})
+        except (TypeError, ValueError, KeyError):
+            continue
+        if times:
+            result[r['id']]=(times[0],times[-1])
+    return result
+
+
 def _elapsed_days(iso):
     if not iso: return None
     try:
@@ -348,23 +416,38 @@ class MemoryRetriever:
         db=self._db(); meta={}
         with db.connect() as con:
             meta={(x['kind'],x['item_id']):dict(x) for x in con.execute('SELECT * FROM retrieval_metadata')}
-            eps=[dict(e) for e in con.execute("SELECT id,title,summary,detail,event_status,time_end_utc,reviewed_at FROM extracted_episodes WHERE review_status IN ('approved','auto_active')")]
+            eps=[dict(e) for e in con.execute("""SELECT id,title,summary,detail,event_status,
+                time_start_utc,time_end_utc FROM extracted_episodes
+                WHERE review_status IN ('approved','auto_active')""")]
+            cand_spans=_source_time_ranges(con)
         out=[]
         for m in db.all_memories():
-            out.append({'kind':'cand','id':m['id'],'title':m['category'],
+            start,end=cand_spans.get(m['id'], (m.get('event_time'),m.get('event_time')))
+            if _trusted_time(m.get('event_time')):
+                start=end=m['event_time']
+            entry={'kind':'cand','id':m['id'],'title':m['category'],
              'content':m['content'],'search':m['content']+' '+m.get('fact_key',''),
              'importance':float(m.get('importance') or .5),'event_time':m.get('event_time'),
-             'metadata':meta.get(('cand',m['id']),{}),'detail':'', 'category':m['category']})
+             'time_start':start,'time_end':end,'recorded_at':m.get('created_at'),
+             'metadata':meta.get(('cand',m['id']),{}),'detail':'', 'category':m['category']}
+            entry['time_label']=_memory_time_label(entry)
+            out.append(entry)
         for e in eps:
-            out.append({'kind':'episode','id':e['id'],'title':e['title'],
+            entry={'kind':'episode','id':e['id'],'title':e['title'],
              'content':e['summary'],'search':' '.join((e['title'],e['summary'])),
              'importance':.55,'event_time':e['time_end_utc'],'metadata':meta.get(('episode',e['id']),{}),
-             'detail':e['detail'],'category':e['event_status']})
+             'time_start':e['time_start_utc'],'time_end':e['time_end_utc'], 'recorded_at':None,
+             'detail':e['detail'],'category':e['event_status']}
+            entry['time_label']=_memory_time_label(entry)
+            out.append(entry)
         for m in self.core.list_memories():
-            out.append({'kind':'legacy','id':m['id'],'title':m.get('category','fact'),
+            entry={'kind':'legacy','id':m['id'],'title':m.get('category','fact'),
              'content':m['content'],'search':m['content']+' '+' '.join(m.get('tags',[])),
              'importance':.55,'event_time':m.get('created_at'),'metadata':meta.get(('legacy',m['id']),{}),
-             'detail':'','category':m.get('category','fact')})
+             'time_start':None,'time_end':None,'recorded_at':m.get('created_at'),
+             'detail':'','category':m.get('category','fact')}
+            entry['time_label']=_memory_time_label(entry)
+            out.append(entry)
         return out
 
     def embedding_index_stats(self):
@@ -544,7 +627,7 @@ class MemoryRetriever:
         # The budget is the primary bound, not the number of cards.
         card_lines=[]
         for e in card_candidates:
-            line=f"- [{e['id']}] {e['title']}：{e['content'][:85]}"
+            line=f"- [{e['id']}] [{e['time_label']}] {e['title']}：{e['content'][:85]}"
             if estimated_tokens('\n'.join(card_lines+[line]))>directory_limit:break
             card_lines.append(line);directory.append(e)
         used=estimated_tokens('\n'.join(card_lines));remaining-=used
@@ -555,7 +638,7 @@ class MemoryRetriever:
             regular={e['id'] for e in directory}
             pool=[e for e in eps if e['id'] not in regular]
             for e in rng.sample(pool,min(len(pool),settings.episode_tool_extra_cards)):
-                line=f"- [{e['id']}] {e['title']}"
+                line=f"- [{e['id']}] [{e['time_label']}] {e['title']}"
                 room=max(0,directory_limit-used-estimated_tokens('\n'.join(tool_lines+[line])))
                 if room<=0:break
                 tool_suggestions.append(e);tool_lines.append(line)
@@ -571,7 +654,7 @@ class MemoryRetriever:
         detail_limit=min(settings.detail_budget_tokens,remaining)
         detail_lines=[]
         for e in selected_eps:
-            line=f"- [{e['id']}] {e['title']}：{e['detail'][:1800]}"
+            line=f"- [{e['id']}] [{e['time_label']}] {e['title']}：{e['detail'][:1800]}"
             if estimated_tokens('\n'.join(detail_lines+[line]))>detail_limit:continue
             detail_lines.append(line);expanded.append(e)
         remaining-=estimated_tokens('\n'.join(detail_lines))
@@ -588,7 +671,7 @@ class MemoryRetriever:
                     role=r.get('role','unknown')
                     message=str(r.get('content',''))[:420]
                     mark='证据' if r.get('cited_as_evidence') else '邻近背景'
-                    line=f"- [{r.get('id','')}; {role}; {mark}] {message}"
+                    line=f"- [{r.get('id','')}; {role}; {mark}; {('来源消息时间（北京时间）：'+r['event_time_local']) if r.get('event_time_local') else '时间未知'}] {message}"
                     if estimated_tokens('\n'.join(detail_lines+raw+[line]))>settings.detail_budget_tokens:break
                     raw.append(line)
                 if raw:
@@ -602,7 +685,7 @@ class MemoryRetriever:
             if (e['relevance'] < settings.cand_relevance_threshold
                     and len(cand)>=settings.cand_min
                     and not (e['pinned'] and e['relevance']>0)):continue
-            line=f"- [{e['id']}] {e['content'][:440]}"
+            line=f"- [{e['id']}] [{e['time_label']}] {e['content'][:440]}"
             if estimated_tokens('\n'.join(fact_lines+[line]))>remaining:break
             fact_lines.append(line);cand.append(e)
         blocks=[]
@@ -617,21 +700,21 @@ class MemoryRetriever:
         body=_slice_budget(body,remaining_total)
         selected=[
                    {'kind':e['kind'],'id':e['id'],'score':round(e['score'],4),'relevance':e['relevance'],
-                    'pinned':e['pinned'],'title':e['title'],'components':e['components']} for e in (directory+cand+expanded)]
+                    'pinned':e['pinned'],'title':e['title'],'time_label':e['time_label'],'components':e['components']} for e in (directory+cand+expanded)]
         return {'question':question,'query_current':question,'query_context':context_query,
                 '_mention_search':{e['kind']+':'+e['id']:e['search'] for e in (directory+cand+expanded)},
                 'context_weight':context_weight,'memory_text':body,'core_text':core,'core_source':core_source,
                 'core_truncated':core_truncated,'core_over_target':core_over_target,
                 'core_requested_tokens':core_needed,
-                'cards':[{'id':e['id'],'title':e['title'],'score':round(e['score'],4)} for e in directory],
-                'cand':[{'id':e['id'],'content':e['content']} for e in cand],
-                'details':[{'id':e['id'],'title':e['title']} for e in expanded],
+                'cards':[{'id':e['id'],'title':e['title'],'time_label':e['time_label'],'score':round(e['score'],4)} for e in directory],
+                'cand':[{'id':e['id'],'content':e['content'],'time_label':e['time_label']} for e in cand],
+                'details':[{'id':e['id'],'title':e['title'],'time_label':e['time_label']} for e in expanded],
                 'selected':selected,'estimated_tokens':estimated_tokens(core)+estimated_tokens(body),
                 'memory_budget_tokens':settings.memory_budget_tokens,'backend':backend,
                 'spontaneous':bool(random_selected),'spontaneous_cards':[e['id'] for e in random_selected
                     if any(c['id']==e['id'] for c in directory)],
                 'tool_available_episode_ids':[e['id'] for e in directory+tool_suggestions if e['id'] in body] if settings.episode_tool_enabled else [],
-                'tool_candidate_cards':[{'id':e['id'],'title':e['title']} for e in tool_suggestions if e['id'] in body],
+                'tool_candidate_cards':[{'id':e['id'],'title':e['title'],'time_label':e['time_label']} for e in tool_suggestions if e['id'] in body],
                 'tool_expansions':[],
                 'selection_policy':{'episode_threshold':settings.episode_relevance_threshold,
                     'cand_threshold':settings.cand_relevance_threshold,'detail_threshold':settings.detail_relevance_threshold,
@@ -659,19 +742,21 @@ class MemoryRetriever:
                 if len(seen)>=limit:break
                 if not isinstance(episode_id,str) or episode_id in seen or episode_id not in allowed:continue
                 seen.add(episode_id)
-                row=con.execute('''SELECT id,title,detail FROM extracted_episodes
+                row=con.execute('''SELECT id,title,detail,time_start_utc,time_end_utc FROM extracted_episodes
                     WHERE id=? AND review_status IN ('approved','auto_active')''',(episode_id,)).fetchone()
                 if not row or not row['detail']:continue
-                head=f"[{row['id']}] {row['title']}："
+                time_label=_memory_time_label({'time_start':row['time_start_utc'],
+                                               'time_end':row['time_end_utc']})
+                head=f"[{row['id']}] [{time_label}] {row['title']}："
                 room=max_budget-used-estimated_tokens(head)-50
                 if room<=0:break
                 detail=_slice_budget(row['detail'],min(room,1200))
                 if not detail:break
-                output.append({'id':episode_id,'title':row['title'],'detail':detail})
+                output.append({'id':episode_id,'title':row['title'],'time_label':time_label,'detail':detail})
                 used+=estimated_tokens(head+detail)+50
         prepared.setdefault('tool_expansions',[]).extend({'id':r['id'],'tokens':estimated_tokens(r['detail'])} for r in output)
         return {'episodes':output,'expanded_count':len(output),'token_estimate':used,
-                'note':'这些是历史摘要，可能不完整；当前工具不读取原始聊天。'}
+                'note':'时间表示来源对话记录时间（北京时间），不必然等于事件真实发生时间；这些是历史摘要，可能不完整；当前工具不读取原始聊天。'}
 
     def commit(self, prepared, *, success=True):
         if not success:return

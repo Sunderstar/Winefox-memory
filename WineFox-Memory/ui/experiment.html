@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>酒狐 · 本地记忆工作台</title>
+<style>
+:root{font-family:system-ui,"Microsoft YaHei",sans-serif;color:#202631;background:#f6f7fa;font-size:14px}*{box-sizing:border-box}body{margin:0}header{background:#fff;border-bottom:1px solid #ddd;padding:14px 22px;position:sticky;top:0;z-index:10}h1{font-size:19px;margin:0 0 6px}nav{display:flex;gap:8px;flex-wrap:wrap}.tab{padding:8px 13px;border:1px solid #c8ccd4;background:#f8fafc;border-radius:6px;cursor:pointer}.tab.active{background:#304b71;color:white;border-color:#304b71}main{max-width:1500px;padding:18px 20px 80px;margin:0 auto}.pane{display:none}.pane.active{display:block}h2{font-size:18px;margin:6px 0 13px}h3{font-size:15px;margin:8px 0}.panel{background:#fff;border:1px solid #dce0e5;border-radius:8px;padding:15px;margin:10px 0}.flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.columns{display:grid;grid-template-columns:1fr 1fr;gap:14px}.threecol{display:grid;grid-template-columns:minmax(240px,1fr) minmax(340px,2fr);gap:14px}.list{max-height:520px;overflow:auto;border:1px solid #e3e4e8;border-radius:6px}.item{padding:11px 12px;border-bottom:1px solid #e9ecf0}.item:last-child{border-bottom:0}.item:hover{background:#fafcff}.item-head{display:flex;align-items:center;gap:8px}.item-title{font-weight:600;flex:1;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.item-meta{font-size:12px;color:#657081}.preview{margin:6px 0;color:#434c5a;white-space:pre-wrap;line-height:1.55;overflow-wrap:anywhere}label{font-size:13px}input,textarea,select{font:inherit;border:1px solid #c8cdd7;border-radius:5px;background:white;padding:6px 8px;max-width:100%}input[type=checkbox]{width:17px;height:17px;cursor:pointer;vertical-align:middle}input[type=number]{width:95px}input.wide{width:270px}textarea{width:100%;min-height:88px;resize:vertical;line-height:1.5}textarea.raw{min-height:60px;max-height:240px}button{font:inherit;border:1px solid #bac3cc;border-radius:5px;background:white;color:#263e60;padding:7px 11px;cursor:pointer}button:hover{background:#e9eff8}button.primary{background:#294a77;color:white;border-color:#294a77}button.warn{border-color:#c9a7aa;color:#8c3035}button:disabled{opacity:.5;cursor:default}.hint{font-size:12px;color:#5a6470;line-height:1.65}.muted{color:#6d7682}.pill{background:#f1f4f9;border:1px solid #dde3ec;border-radius:12px;padding:2px 7px;font-size:11px;white-space:nowrap}.pill.ok{background:#edf7f0}.pill.bad{background:#fff1ed}.editor{min-height:480px}.editor label{display:block;margin-top:10px;font-weight:600}.editor input,.editor select{width:100%}.editor .row{display:flex;gap:10px}.editor .row>*{flex:1}.decision{white-space:nowrap;font-size:12px;color:#505b65}.small{font-size:12px}pre{font:12px/1.55 ui-monospace,Consolas,monospace;background:#f5f7fb;white-space:pre-wrap;word-break:break-word;padding:10px;border-radius:5px;max-height:380px;overflow:auto}details>summary{cursor:pointer;font-weight:600}#toast{position:fixed;bottom:24px;right:20px;max-width:560px;background:#253953;color:white;padding:12px 18px;border-radius:6px;box-shadow:0 4px 14px #0004;display:none;z-index:99;white-space:pre-wrap}.statusbar{font-size:12px;color:#3f5974;padding:9px 12px;background:#edf2f9;border-radius:6px;line-height:1.6}.sample-text{border-left:3px solid #d5deeb;padding-left:9px;margin-top:8px}.tag{font-size:11px;border:1px solid #d8dce4;padding:1px 6px;border-radius:4px}.danger-note{color:#934345}.nowrap{white-space:nowrap}.scrollmax{max-height:65vh;overflow-y:auto}@media(max-width:900px){.columns,.threecol{grid-template-columns:1fr}main{padding:12px}header{padding:10px}}
+</style></head>
+<body><header><h1>酒狐 · 记忆实验工作台 <span class="pill">v0.3b.4</span></h1>
+<nav><a href="/" class="tab">返回日常工作台</a><button class="tab active" data-tab="sample">① 原文选择与编辑</button><button class="tab" data-tab="experiment">② 模型实验与对照</button><button class="tab" data-tab="review">③ Cand / Episode 审核</button><button class="tab" data-tab="library">④ 长期记忆与召回</button><button class="tab" data-tab="retrieval">⑤ 召回配置与预览</button><button class="tab" data-tab="guide">⑥ 数据流说明</button></nav></header>
+<main>
+<section class="pane active" id="tab-sample">
+<h2>原始对话：逐条预览、勾选、修改并冻结实验样本</h2>
+<p class="hint">你编辑的是<strong>实验副本</strong>，不改变 Minecraft / 终端 / QQ 的原始 JSONL。编号是原始记录顺序（从 1 开始）；选择的编号可不连续，但将按原来的时间顺序发送给模型。每份样本固定原文和已有记忆快照，后续模型比较不会受之前测试产生的 Cand 影响。</p>
+<div class="panel"><div class="flex"><label>来源 <select id="src"><option value="chat">chat（Minecraft/终端/QQ）</option><option value="autonomous">autonomous（自主发言）</option></select></label>
+<label>起点（第几条） <input type="number" id="start" min="1" value="1"></label><label>加载条数 <input type="number" id="count" min="1" max="500" value="40"></label><button id="load">加载原文</button><button id="next">跳到下一条未处理</button><button id="select-all">全选</button><button id="invert">反选</button></div>
+<div class="statusbar" id="source-info">加载中…</div></div>
+<div class="columns"><div class="panel"><h3>原始消息列表（勾选需要压缩的消息）</h3><div id="record-list" class="list scrollmax"></div></div>
+<div class="panel"><h3>冻结为可复现实验样本</h3><div class="flex"><label>样本名称 <input id="sample-title" class="wide" placeholder="例如：纸飞机·人格讨论对照"></label><button class="primary" id="freeze">冻结勾选内容</button></div>
+<p class="hint">冻结后无法修改，以免 A/B 的输入偷偷变化。若要改变文本或勾选范围，请保存为另一份样本。最多 80 条、总文本不超过 30,000 字符；每条消息最多 4,500 字符。</p>
+<div id="selected-info" class="statusbar">尚未选择消息</div><h3>已冻结样本</h3><div id="sample-list" class="list"></div></div></div>
+</section>
+<section class="pane" id="tab-experiment"><h2>固定样本 · 模型实验</h2>
+<div class="panel"><div class="flex"><label>测试样本 <select id="exp-sample"></select></label><label>模型 <input id="model" class="wide" value="deepseek-v4-pro"></label>
+<label>思考 <select id="effort"><option>none</option><option>low</option><option selected>high</option><option>max</option></select></label>
+<label>架构 <select id="mode"><option value="two-pass" selected>Two-pass（默认）</option><option value="one-pass">One-pass</option></select></label>
+<label><input type="checkbox" id="verify"> 第三阶段核验（另一次 API 调用）</label></div>
+<div class="flex"><label>单次输出 Token 上限 <input type="number" id="max-tokens" min="2000" max="100000" value="16384"></label><label>单次请求超时（秒） <input type="number" id="timeout" min="10" max="600" value="240"></label>
+<label>本次测试的标记 <input id="variant-label" placeholder="例如：Pro 高思考"></label><button class="primary" id="run">单次运行（付费）</button></div>
+    <div class="panel" style="background:#f8fafc"><h3>同一样本并行 A/B 测试</h3>
+    <p class="hint">先选定冻结样本，把每组配置加入队列，一键启动；最多提交 6 组，其中最多 3 组同时调用 API，其他排队。单个任务内部仍按 Stage 1 → 2 → 可选 3 顺序执行。</p>
+    <div class="flex"><button id="variant-add">将当前配置加入对照</button><button id="variant-presets">预设 3 组（Pro-High / Pro-Max / Flash-High）</button><button id="variant-clear">清空配置</button><button class="primary" id="variant-run">并行执行配置（付费）</button></div>
+    <div id="variant-list" class="list"></div></div>
+<p class="hint">Two-pass 调用两次模型：先生成 Episode，再生成 Cand。第三阶段核验默认关闭。每次实验产生一份独立的待审核结果，不修改原始数据，也不把这些原文标记成正常提炼任务中的“已处理”。</p><div id="job-status" class="statusbar">未启动任务</div><div id="jobs-status" class="list"></div></div>
+<div class="columns"><div class="panel"><h3>模型运行历史</h3><div class="flex"><button id="refresh-runs">刷新</button><select id="run-select"></select><button id="open-run">打开审核界面</button></div><div id="runs-list" class="list"></div></div>
+<div class="panel"><h3>同一冻结样本的结果对照</h3><button id="compare">刷新对照</button><p class="hint">对照使用相同的选中消息与编辑内容、相同的已知记忆快照。模型输出和 Token 数可能不同；数量差异不等于质量差异。</p><div id="compare-result" class="list"></div></div></div>
+</section>
+<section class="pane" id="tab-review"><h2>Cand / Episode 点击审核</h2>
+<div class="panel"><div class="flex"><label>当前运行 <select id="review-run"></select></label><button id="review-load">载入</button><button class="primary" id="bulk">批量执行勾选的同意/拒绝</button><button id="clear-decisions">清除勾选</button></div><p class="hint">左右两栏分别是候选事实记忆和情景事件。点击标题查看完整内容与证据，可编辑并保存；勾选“同意/拒绝”后点击批量审核。两者各自独立，<strong>批准 Episode 不要求批准任何 Cand</strong>。已批准的记录不能再次批准。</p><div class="statusbar" id="review-summary">尚未选择运行</div></div>
+<div class="columns"><div class="panel"><h3>Cand · 候选长期事实（预览正文开头）</h3><div class="list" id="cand-list"></div></div><div class="panel"><h3>Episode · 完整情景（预览事件标题）</h3><div class="list" id="episode-list"></div></div></div>
+<div class="panel"><div class="flex"><button id="export-json">下载本次压缩结果 JSON</button><button id="export-md">下载可阅读的 Markdown</button><button id="export-full">下载含原文和模型输出的完整 JSON</button></div>
+    <p class="hint">导出包括 Cand、Episode、核验意见、审批状态和自定义样本名称；完整 JSON 另外包含原文及模型回复，请妥善保存。</p></div>
+    <div class="panel editor" id="detail-editor"><h3>点击上方某条 Cand 或 Episode 开始查看与编辑</h3></div><div class="panel"><h3>批量操作回执</h3><div id="bulk-result" class="hint">尚未提交</div></div>
+</section>
+<section class="pane" id="tab-library"><h2>审核后记忆实际保存在哪里？可以怎样召回？</h2>
+<div class="panel"><p class="hint">批准 Cand：在 `data/memory.db` 的 <code>memories</code> 表新增一条 <code>status=active</code> 的正式记忆，并将原候选标为 approved、关联新记忆 ID。批准 Episode：直接将 <code>extracted_episodes.review_status</code> 改为 approved，不需要复制到 Cand。原始 <code>chat_history.jsonl</code> 始终保留。</p>
+<div class="flex"><label>检索问题 <input id="recall-q" class="wide" placeholder="例如：纸飞机 / 博物馆 / 阅读"></label><label>深度 <select id="recall-level"><option value="summary">summary</option><option value="detail">detail</option><option value="raw">raw</option></select></label><button id="recall">查看召回</button><button id="refresh-library">刷新正式记忆及计划</button></div><pre id="recall-result"></pre></div>
+<div class="columns"><div class="panel"><h3>正式长期事实记忆（memories.active）</h3><div id="memory-list" class="list"></div></div><div class="panel"><h3>未完成或已完成的计划（episode_plans）</h3><div id="plan-list" class="list"></div></div></div>
+</section>
+<section class="pane" id="tab-retrieval">
+<div class="panel"><h3>自动 Archive · 达到阈值后后台 Two-pass 提炼（v0.3b.2）</h3>
+<p class="hint">默认关闭，开启后可能产生 API 费用。正常聊天成功写入后检查未提炼消息，满足阈值时启动一批后台任务。原文仍保留。新 Cand/Episode 标记为 <code>auto_active</code>，立即可召回，但可随时编辑、同意或拒绝。冻结模型实验不会自动入档；出现同事实键冲突的候选继续等待人工处理。</p>
+<div class="flex"><label><input type="checkbox" id="auto-archive-enabled"> 自动归档启用（会调用付费模型）</label><label>未处理消息阈值 <input type="number" id="auto-archive-threshold" min="4" max="10000" value="24"></label><label>保留最新消息 <input type="number" id="auto-archive-tail" min="0" max="5000" value="4"></label><label>单批最大消息 <input type="number" id="auto-archive-max" min="4" max="500" value="40"></label></div>
+<div class="flex"><button class="primary" id="auto-archive-save">保存自动归档配置</button><button id="auto-archive-load">刷新状态</button><button id="auto-archive-start">处理已达阈值的一批（调用 API）</button></div>
+<pre id="auto-archive-status">尚未加载。</pre><p class="hint">后台任务结果与失败原因会一直保存在 SQLite 的 auto_archive_jobs 表，可刷新查看。一次自动触发至多处理一批，禁止静默无限重试。</p></div><h2>v0.3b · 每轮记忆注入设置与可复现预览</h2>
+<p class="hint">不删除原始对话、Cand、Episode。这里只改变下一轮聊天选择哪些历史。每项预算均为保守字符估算的 Token，不是模型商提供的实际 Tokenizer 账单。所有修改只作用于本地 data 目录。修改后下一轮终端对话生效。</p>
+<div class="columns">
+<div class="panel"><h3>召回参数</h3><div id="recall-settings" class="columns"></div><div class="flex"><button class="primary" id="retrieval-settings-save">保存配置</button><button id="retrieval-settings-load">重新读取</button></div><p class="hint">语义后端 auto：只在本机已安装并缓存 Embedding 模型时启用；否则明确回退为词组检索。lexical：强制离线词组。sentence_transformers：尝试本地模型，失败仍回退并在预览中提示。不会自动联网下载模型。</p></div>
+<div class="panel"><h3>Core Memory（与 persona.md 分离）</h3>
+<p class="hint" id="retrieval-core-origin">尚未加载。</p><p class="hint">下方编辑区仅是手工/旧版 Core；AI 自动条目独立存放，不会被此处编辑覆盖。</p><textarea id="retrieval-core-text" style="min-height:290px"></textarea>
+<div class="flex"><button class="primary" id="retrieval-core-save">保存 Core Memory</button><button id="retrieval-core-load">重新读取</button></div>
+<p class="hint">首次保存会将 legacy memory.md 中的内容复制到一个历史快照，不删除旧文件；此后聊天只读 core_memory.md，且受 Core 预算限制。每次修改会备份旧版本。</p>
+<div class="flex"><select id="retrieval-core-versions"></select><button id="retrieval-core-restore" class="warn">恢复所选旧版本</button></div></div></div>
+<div class="panel"><h3>AI 自动 Core Memory · v0.3b.1</h3>
+<p class="hint">无需逐条提升 Cand/Episode。整理器只读取已批准内容；模型自动挑选、合并、降级，独立写入 SQLite，保留版本和来源。<b>首次启用自动整理前请在上方参数中将 core_auto_enabled 勾选并保存</b>。它会在批准记忆达到阈值后调用一次独立模型并产生 API 费用；失败不自动重试。默认关闭，以免升级后意外收费。</p>
+<div class="flex"><button id="core-auto-preview">刷新待整理列表</button><button class="primary" id="core-auto-run">立即整理新增记忆（调用 API）</button><button id="core-auto-history-load">查看历史版本</button></div>
+<div class="columns"><div><h4>待整理与当前 AI Core</h4><pre id="core-auto-info">尚未加载。</pre><h4>当前 AI 条目</h4><div id="core-auto-entries" class="list"></div></div><div><h4>运行状态与可回退版本</h4><pre id="core-auto-job">未运行。</pre><div id="core-auto-history" class="list"></div></div></div>
+<h4>本地向量索引状态</h4><p class="hint">BGE 首次运行前应自行安装并缓存本地模型；后续向量会存储到 SQLite，只有文本变化才重新编码。不联网下载模型。</p><button id="retrieval-embedding-status">读取向量索引状态</button><pre id="retrieval-embedding-info">尚未加载。</pre>
+</div>
+<div class="panel"><h3>不联网预览当前问题的记忆召回</h3>
+<div class="flex"><label>输入拟问的话 <input class="wide" id="retrieval-preview-q" value="酒狐，你还记得纸飞机吗？"></label><label>实验随机种子 <input id="retrieval-preview-seed" type="number" value="0"></label><button class="primary" id="retrieval-preview">预览召回（不调用聊天 API）</button></div>
+<pre id="retrieval-preview-info">未执行预览。</pre><details><summary>查看实际准备注入的历史记忆文本</summary><pre id="retrieval-preview-body"></pre></details></div>
+<div class="panel"><h3>点击设置：已批准记忆的 Pinned / 显著性</h3>
+<p class="hint">直接勾选并调整，不用复制 ID；最多显示最近 500 条已批准或手工保存的记忆，未审核记录不会显示。</p>
+<div class="flex"><label>筛选 <input id="retrieval-item-filter" class="wide" placeholder="例如：纸飞机 / 写作计划"></label><button id="retrieval-item-refresh">加载已批准记忆</button></div>
+<div id="retrieval-item-list" class="list"></div></div>
+<div class="columns"><div class="panel"><h3>按 ID 设置：Pinned / 重要性（高级）</h3>
+<p class="hint">可直接输入已批准的 memdb_...、ep_... 或手工 mem_... ID。Pinned 只提高被检索排序的权重，不保证每轮强行注入全部条目。</p>
+<div class="flex"><label>类型 <select id="meta-kind"><option value="cand">Cand 正式记忆</option><option value="episode">Episode</option><option value="legacy">手工记忆</option></select></label><label>ID <input id="meta-id" class="wide" placeholder="ep_... / memdb_..."></label><button id="meta-load">读取</button></div>
+<div class="flex"><label><input type="checkbox" id="meta-pinned"> Pinned</label><label>重要性 0～1（空白代表用提炼默认值） <input id="meta-importance" placeholder="留空"></label><button class="primary" id="meta-save">保存属性</button></div><pre id="meta-result"></pre></div>
+<div class="panel"><h3>最近实际聊天的召回日志</h3><button id="retrieval-logs-load">刷新日志</button><pre id="retrieval-logs">还没有加载。</pre><p class="hint">日志仅记录查询摘要、选中 ID、估算预算与后端，不保存完整的 API 请求和密钥。预览本身不会更新热度。</p></div></div>
+</section>
+<section class="pane" id="tab-guide"><h2>数据流与运行原理</h2><div class="panel"><h3>原始记录始终存在</h3><p>终端、QQ、Minecraft 的原始聊天文件位于 <code>data/chat_history.jsonl</code>，自主发言位于 <code>data/autonomous_history.jsonl</code>。程序读取原文进行提炼，从不删除已处理记录。你在工作台对话文本的编辑只影响冻结的实验副本。</p><h3>为什么正常提炼会跳过已经处理的消息？</h3><p>正常的 <code>memory-extract</code> 会查询 SQLite 表 <code>processed_records</code>，过滤已经成功提炼的消息 ID。这只是为了不重复消耗 API，不意味着删去原文，也不意味着全局语义去重。必要时可通过命令行的 <code>--reprocess</code> 重做。<strong>本工作台的固定样本实验完全不更新 processed_records</strong>，因此允许你在相同消息上反复测试不同模型。</p><h3>分阶段输入和输出</h3><p><b>冻结样本：</b>勾选和编辑后的消息 → <code>ui_samples</code> 表中的不可变记录，以及当时的已有记忆快照。<br><b>Stage 1：</b>冻结原文 → Episode 事件（标题、summary、detail、计划和证据 ID）。<br><b>Stage 2：</b>原文 + Episode → Cand 事实/约定/偏好/计划候选。<br><b>可选 Stage 3：</b>原文 + 两阶段结果 → 核验报告，仅作审核建议，不自动修改或反复重试。<br><b>审核：</b>人工修改/同意/拒绝 → 正式记忆。</p><h3>具体存储位置</h3><p>SQLite 文件 <code>data/memory.db</code>：<code>extraction_runs</code> 记录输入、模型、提示词、原始回复与 Token 用量；<code>extracted_episodes</code> 与 <code>episode_plans</code> 保存事件和计划；<code>candidates</code> 保存待审批短事实；<code>memories</code> 保存已批准事实；<code>candidate_episode_links</code> 保存两者关系；<code>ui_samples</code> 和 <code>ui_sample_runs</code> 保存实验快照与运行关联；<code>ui_edit_history</code> 保存界面编辑历史。人工编辑不会覆盖模型原始输出。</p><h3>回答时怎样召回？</h3><p>程序从正式事实记忆和已批准 Episode 检索相关内容：普通问题先使用短摘要，询问过程时展开 Episode 详情，询问原话时再加载 Raw。人工已批准及经启用的 AI 自动归档（auto_active）可参与召回；未启用自动归档时的 pending 草稿不参与召回。自动可用不表示人工验证。</p><h3>重要限制</h3><p>本界面是本机工具，不支持公网部署和多人协作。实验样本编辑后产生的是“反事实/修订语料”测试，必须区分于真实原话；如需严格事实核对，应使用未修改的原始文本。模型调用存在实际费用。批量审批会逐条执行，有错误时返回具体错误而非整批回滚。工作台不直接修改 <code>persona.md</code>。</p></div></section>
+<div class="panel" id="diagnostics"><h2>错误日志（保留，不自动消失）</h2><div class="flex"><button id="refresh-errors">刷新错误</button><button id="copy-errors">复制全部错误信息</button><a href="/api/errors/download" download="winefox_errors.jsonl">下载 JSONL 错误日志</a></div><p class="hint">错误也会持久写入 data/logs/memory_workbench_errors.jsonl。日志可能包含程序路径、错误详情，请不要公开发送包含隐私的日志。</p><pre id="error-console" style="max-height:360px;overflow:auto;white-space:pre-wrap">目前没有错误。</pre></div>
+    </main><div id="toast"></div>
+<script>
+const SESSION='__WINEFOX_TOKEN__';let SAMPLE_CACHE=[],RUN_CACHE=[],RECORDS=[],CURRENT_RUN=null,CURRENT_DETAIL=null,DECISIONS={},VARIANTS=[],ACTIVE_JOBS={};
+const $=id=>document.getElementById(id);const text=(el,s)=>{el.textContent=s??'';return el};
+function el(tag,attrs={},children=[]){const e=document.createElement(tag);for(const [k,v] of Object.entries(attrs)){if(k==='class')e.className=v;else if(k==='text')e.textContent=v;else if(k==='value')e.value=v;else if(k==='checked')e.checked=!!v;else if(k==='onclick')e.addEventListener('click',v);else if(k==='title')e.title=v;else e.setAttribute(k,v)}for(const c of children){if(c==null)continue;e.append(typeof c==='string'?document.createTextNode(c):c)}return e}
+function toast(msg,ms=4500){const t=$('toast');text(t,String(msg));t.style.display='block';clearTimeout(toast._id);toast._id=setTimeout(()=>t.style.display='none',ms)}
+async function api(path,data){const opt={cache:'no-store'};if(data!==undefined){opt.method='POST';opt.headers={'Content-Type':'application/json','X-WineFox-Token':SESSION};opt.body=JSON.stringify(data)}const r=await fetch(path,opt);const obj=await r.json();if(!r.ok)throw new Error(obj.error||`HTTP ${r.status}`);return obj}
+function persistError(message){const box=$('error-console');text(box,(new Date().toLocaleString()+'  '+message+'\n\n'+(box.textContent==='目前没有错误。'?'':box.textContent)).slice(0,20000));console.error(message)}
+async function safely(fn){try{await fn()}catch(e){persistError('错误：'+e.message);toast('错误已保留在页面底部的日志框',5000)}}
+$('refresh-errors').onclick=()=>safely(async()=>{const v=await api('/api/errors');text($('error-console'),v.entries.length?v.entries.map(e=>`${e.timestamp} [${e.context}] ${e.type}: ${e.message}\n${e.traceback}`).join('\n\n'):'目前没有错误。')});
+$('copy-errors').onclick=()=>safely(async()=>{await navigator.clipboard.writeText($('error-console').textContent);toast('已复制错误日志')});
+function tab(name){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.pane').forEach(e=>e.classList.toggle('active',e.id==='tab-'+name))}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tab(b.dataset.tab);if(b.dataset.tab==='library')safely(refreshLibrary);if(b.dataset.tab==='retrieval')safely(async()=>{await loadAutoArchive();await loadRetrievalSettings();await loadCore();await loadCoreAuto();await loadRetrievalLogs();await loadRetrievalItems()})})
+const short=(s,n=85)=>s&&s.length>n?s.slice(0,n)+'…':s||'';
+function option(x,value,title){x.append(el('option',{value,text:title}))}
+function fillRunSelect(){for(const id of ['run-select','review-run']){const x=$(id),v=x.value;x.replaceChildren();for(const r of RUN_CACHE)option(x,r.id,`${r.display_title||r.id} [${r.status}]`);if(RUN_CACHE.some(r=>r.id===v))x.value=v}}
+function fillSampleSelect(){const x=$('exp-sample'),v=x.value;x.replaceChildren();for(const s of SAMPLE_CACHE)option(x,s.id,`${s.title} (${s.message_count}条 · ${s.id.slice(-6)})`);if(SAMPLE_CACHE.some(s=>s.id===v))x.value=v}
+async function bootstrap(){const b=await api('/api/bootstrap');SAMPLE_CACHE=b.samples;RUN_CACHE=b.runs;fillSampleSelect();fillRunSelect();renderSamples();renderRuns();await loadRecords();await $('refresh-errors').onclick();const jobs=await api('/api/jobs');for(const j of jobs){ACTIVE_JOBS[j.id]=j;if(['queued','running'].includes(j.status))pollJob(j.id)}renderJobList()}
+async function loadAutoArchive(){
+ const [c,p,j]=await Promise.all([api('/api/auto-archive/settings'),api('/api/auto-archive/preview'),api('/api/auto-archive/jobs')]);
+ $('auto-archive-enabled').checked=!!c.enabled;
+ $('auto-archive-threshold').value=c.trigger_messages;
+ $('auto-archive-tail').value=c.keep_recent_messages;
+ $('auto-archive-max').value=c.max_messages;
+ text($('auto-archive-status'),JSON.stringify({preview:p,recent_jobs:j.slice(0,8)},null,2));
+}
+$('auto-archive-load').onclick=()=>safely(loadAutoArchive);
+$('auto-archive-save').onclick=()=>safely(async()=>{
+ const enabled=$('auto-archive-enabled').checked;
+ if(enabled&&!confirm('开启后，正常聊天达到阈值时会自动调用付费记忆模型。确认开启吗？'))return;
+ await api('/api/auto-archive/settings',{changes:{enabled,
+ trigger_messages:Number($('auto-archive-threshold').value),
+ keep_recent_messages:Number($('auto-archive-tail').value),
+ max_messages:Number($('auto-archive-max').value)}});
+ toast('自动归档配置已保存');await loadAutoArchive();
+});
+$('auto-archive-start').onclick=()=>safely(async()=>{
+ if(!confirm('现在若消息达到阈值，将调用 API 提炼一批原始聊天。继续？'))return;
+ const r=await api('/api/auto-archive/start',{});
+ text($('auto-archive-status'),JSON.stringify(r,null,2));toast('自动归档：'+r.status);
+});
+async function loadRecords(startOverride){const src=$('src').value;const start=Math.max(0,(startOverride??(Number($('start').value)-1)));const count=Number($('count').value)||40;const result=await api(`/api/records?source=${encodeURIComponent(src)}&start=${start}&count=${count}`);RECORDS=result.items;$('start').value=start+1;text($('source-info'),`共 ${result.total} 条 | 当前显示第 ${start+1}～${start+result.items.length} 条 | 下一条尚未顺序提炼：第 ${result.next_unprocessed_index+1} 条 | 你仍可重选已处理消息`);renderRecords();}
+function renderRecords(){const box=$('record-list');box.replaceChildren();for(const r of RECORDS){const chk=el('input',{type:'checkbox',checked:true});chk.className='check-record';chk.dataset.id=r.id;chk.onchange=selectedStats;const tag=el('span',{class:'pill',text:`#${r.index+1} ${r.role} / ${r.platform}${r.processed?' · 已提炼':''}`});const textarea=el('textarea',{class:'raw',title:'只改变实验副本，不修改原始档案'});textarea.value=r.content;textarea.dataset.id=r.id;textarea.addEventListener('input',selectedStats);const item=el('div',{class:'item'},[el('div',{class:'item-head'},[chk,tag]),el('div',{class:'sample-text'},[textarea]),r.truncated_for_api?el('div',{class:'hint danger-note',text:'此条原文超过 4500 字符：API 预览内容已截断'}):null]);box.append(item)}selectedStats()}
+function selectedEntries(){return [...document.querySelectorAll('.check-record')].filter(x=>x.checked).map(x=>({id:x.dataset.id,content:document.querySelector('textarea.raw[data-id="'+x.dataset.id+'"]')?.value||''}))}
+function selectedStats(){const entries=selectedEntries();text($('selected-info'),`已选 ${entries.length} 条；正文 ${entries.reduce((s,e)=>s+e.content.length,0)} 字符；勾选仅影响未来冻结的测试样本。`)}
+$('load').onclick=()=>safely(()=>loadRecords());$('next').onclick=()=>safely(async()=>{const v=await api(`/api/records?source=${$('src').value}&start=0&count=1`);await loadRecords(v.next_unprocessed_index)});$('select-all').onclick=()=>{document.querySelectorAll('.check-record').forEach(x=>x.checked=true);selectedStats()};$('invert').onclick=()=>{document.querySelectorAll('.check-record').forEach(x=>x.checked=!x.checked);selectedStats()};
+$('freeze').onclick=()=>safely(async()=>{const entries=selectedEntries();if(!entries.length)throw new Error('至少勾选一条消息');if(!confirm(`冻结 ${entries.length} 条原文为不可变实验样本？之后各模型会使用同一份内容。`))return;const saved=await api('/api/sample/create',{source:$('src').value,title:$('sample-title').value,entries});toast(`已冻结 ${saved.count} 条，包含 ${saved.edited_count} 条实验编辑。`);await refreshSamples();$('exp-sample').value=saved.id;tab('experiment')});
+async function refreshSamples(){SAMPLE_CACHE=await api('/api/samples');fillSampleSelect();renderSamples()}
+function renderSamples(){const box=$('sample-list');box.replaceChildren();for(const s of SAMPLE_CACHE){box.append(el('div',{class:'item'},[el('div',{class:'item-head'},[el('span',{class:'item-title',text:s.title}),el('span',{class:'pill',text:`${s.message_count}条 / ${s.run_count}次`})]),el('div',{class:'item-meta',text:`${s.id} · HASH ${s.sample_hash.slice(0,14)}…`}),el('button',{onclick:()=>{tab('experiment');$('exp-sample').value=s.id},text:'在此样本上运行实验'})]))}}
+async function refreshRuns(){RUN_CACHE=await api('/api/runs');fillRunSelect();renderRuns()}
+function renderRuns(){const box=$('runs-list');box.replaceChildren();for(const r of RUN_CACHE){const item=el('div',{class:'item'},[el('div',{class:'item-head'},[el('span',{class:'item-title',text:r.display_title||r.id,onclick:()=>selectRun(r.id)}),el('span',{class:'pill '+(r.status==='succeeded'?'ok':'bad'),text:r.status})]),el('div',{class:'item-meta',text:`${r.status} · ${r.created_at} · ${r.id} ${r.experiment?'· '+r.model+' / '+r.mode:''}`}),el('button',{text:'打开结果 / 审核',onclick:()=>selectRun(r.id)})]);box.append(item)}}
+function selectRun(id){$('run-select').value=id;$('review-run').value=id;tab('review');safely(()=>loadReview(id))}
+function downloadRun(fmt){if(!CURRENT_RUN){persistError('请先选择运行后下载');return}const a=document.createElement('a');a.href='/api/export/run?id='+encodeURIComponent(CURRENT_RUN)+'&format='+encodeURIComponent(fmt);a.download='';document.body.append(a);a.click();a.remove()}
+$('export-json').onclick=()=>downloadRun('json');$('export-md').onclick=()=>downloadRun('md');$('export-full').onclick=()=>downloadRun('full');
+$('refresh-runs').onclick=()=>safely(refreshRuns);$('open-run').onclick=()=>selectRun($('run-select').value)
+function currentVariant(){return {sample_id:$('exp-sample').value,model:$('model').value.trim(),effort:$('effort').value,mode:$('mode').value,verify:$('verify').checked,max_tokens:+$('max-tokens').value,timeout:+$('timeout').value,variant_label:$('variant-label').value.trim()}}
+function renderVariants(){const box=$('variant-list');box.replaceChildren();for(const [i,v] of VARIANTS.entries()){const remove=el('button',{text:'移除',onclick:()=>{VARIANTS.splice(i,1);renderVariants()}});box.append(el('div',{class:'item'},[el('span',{text:`${i+1}. ${v.variant_label||'未命名方案'} · ${v.model} · ${v.effort} · ${v.mode} ${v.verify?' · 核验':''}`}),remove]))}}
+$('variant-add').onclick=()=>{if(VARIANTS.length>=6)return persistError('每批至多 6 组');VARIANTS.push(currentVariant());renderVariants()};
+$('variant-clear').onclick=()=>{VARIANTS=[];renderVariants()};
+$('variant-presets').onclick=()=>{const base=currentVariant();VARIANTS=[{...base,model:'deepseek-v4-pro',effort:'high',variant_label:'Pro-High'},{...base,model:'deepseek-v4-pro',effort:'max',variant_label:'Pro-Max'},{...base,model:'deepseek-flash',effort:'high',variant_label:'Flash-High'}];renderVariants()};
+function renderJobList(){const box=$('jobs-status');box.replaceChildren();for(const j of Object.values(ACTIVE_JOBS)){const status=j.status==='succeeded'?(j.result?.verification_error?'提炼成功，核验失败':'成功'):j.status;box.append(el('div',{class:'item'},[el('span',{text:`${j.variant_label||j.id} · ${status} ${j.result?.run_id||''} ${j.error||''}`}),j.result?.run_id?el('button',{text:'打开审核',onclick:()=>selectRun(j.result.run_id)}):null]))}}
+function startPoll(jobs){for(const j of jobs){ACTIVE_JOBS[j.job_id]={id:j.job_id,status:'queued'};pollJob(j.job_id)}renderJobList()}
+$('run').onclick=()=>safely(async()=>{const payload=currentVariant();if(!payload.sample_id)throw new Error('请先冻结或选择样本');if(!confirm(`将付费调用 ${payload.model} / ${payload.effort} / ${payload.mode}，确定执行？`))return;const j=await api('/api/run/start',payload);startPoll([j]);text($('job-status'),'已启动单次提炼；后台结果保留。')});
+$('variant-run').onclick=()=>safely(async()=>{if(!VARIANTS.length)throw new Error('先加入至少一组对照配置');const sample_id=$('exp-sample').value;if(!sample_id)throw new Error('请选冻结样本');const variants=VARIANTS.map(x=>({...x,sample_id}));if(!confirm(`将同一份样本并行提交 ${variants.length} 组付费实验，最多 3 组同时调用 API；确定执行？`))return;const response=await api('/api/run/batch',{variants});startPoll(response.jobs);text($('job-status'),`已提交 ${response.jobs.length} 组，最多 ${response.concurrency_limit} 组同时调用 API。`) });
+async function pollJob(job_id){const job=await api('/api/job?id='+encodeURIComponent(job_id));ACTIVE_JOBS[job_id]=job;renderJobList();if(['queued','running'].includes(job.status)){setTimeout(()=>safely(()=>pollJob(job_id)),1500);return}if(job.status==='succeeded'){if(job.result?.verification_error)persistError('提炼完成但核验失败，候选已保留：'+job.result.verification_error);await refreshRuns();text($('job-status'),`已完成：${job.result.run_id}；${job.message}`)}else{persistError(`任务 ${job_id} 失败：${job.error}，详见 ${job.log_path||'错误日志'}`);await refreshRuns()}}
+$('compare').onclick=()=>safely(async()=>{const id=$('exp-sample').value;if(!id)return;const result=await api('/api/compare?sample_id='+encodeURIComponent(id));const box=$('compare-result');box.replaceChildren();box.append(el('div',{class:'item statusbar',text:`固定样本 ${result.sample.sample_hash.slice(0,16)}… · 已完成 ${result.runs.length} 次` }));for(const r of result.runs){const usage=r.usage||[];const total=usage.reduce((s,u)=>s+Number(u.total_tokens||u.usage?.total_tokens||0),0);const details=el('details',{},[el('summary',{text:`${r.display_title} | ${r.episodes} Episode, ${r.candidates} Cand | ${total||'?'} tokens`}),el('pre',{text:'Episode:\n'+r.episode_titles.join('\n')+'\n\nCand:\n'+r.candidate_texts.join('\n\n')} )]);box.append(el('div',{class:'item'},[details,el('button',{text:'前往审核',onclick:()=>selectRun(r.run_id)})]))}})
+let editingContext={};let reviewData={};
+$('review-load').onclick=()=>safely(()=>loadReview($('review-run').value));
+async function loadReview(id){if(!id)throw new Error('请选择运行');CURRENT_RUN=id;reviewData=await api('/api/run?id='+encodeURIComponent(id));DECISIONS={};const e=reviewData.episodes||[],c=reviewData.candidates||[];text($('review-summary'),`${reviewData.display_title||id} · ${reviewData.status} · ${c.length} Cand / ${e.length} Episode · ${reviewData.input_payload?.message_count||0} 条原文 · 模型原始回复保存在 extraction_runs；已修改草稿不会覆盖原模型输出。`);if(reviewData.verification_failure)persistError('本次运行的核验未完成：'+reviewData.verification_failure.error_text);if(reviewData.validation_issues?.length){const issues=reviewData.validation_issues;const quarantined=issues.filter(i=>i.action==='quarantined').length;const filtered=issues.filter(i=>i.action!=='quarantined').length;persistError(`本次模型输出有 ${quarantined} 条隔离项、${filtered} 项引用修正；原始回复与逐条诊断均已保留，可下载完整 JSON 或 Markdown 查看详情。`);text($('review-summary'),$('review-summary').textContent+` · 校验异常 ${issues.length} 项（隔离 ${quarantined} 项）`)}renderReviewItems();$('detail-editor').replaceChildren(el('h3',{text:'选择任意一条以查看完整内容、原始证据与编辑字段'}))}
+function decisionInput(type,id,name){const input=el('input',{type:'checkbox'});input.checked=DECISIONS[type+id]===name;input.onchange=()=>{if(input.checked)DECISIONS[type+id]=name;else delete DECISIONS[type+id];renderReviewItems()};return input}
+function renderReviewItems(){const lists=[['candidate','cand-list',reviewData.candidates||[]],['episode','episode-list',reviewData.episodes||[]]];for(const [kind,listId,items] of lists){const box=$(listId);box.replaceChildren();for(const item of items){const id=item.id;const status=kind==='candidate'?item.status:item.review_status;const preview=kind==='candidate'?short(item.content,100):item.title;const span=el('span',{class:'item-title',text:preview,title:preview,onclick:()=>safely(()=>openDetail(kind,id))});const actions=el('div',{class:'flex decision'},(status==='pending'||status==='auto_active')?[el('label',{},[decisionInput(kind,id,'approve'),' 同意']),el('label',{},[decisionInput(kind,id,'reject'),' 拒绝'])]:[el('span',{class:'pill ok',text:'已审核：'+status})]);box.append(el('div',{class:'item'},[el('div',{class:'item-head'},[span,el('span',{class:'pill',text:status})]),actions]))}}}
+$('clear-decisions').onclick=()=>{DECISIONS={};renderReviewItems()}
+$('bulk').onclick=()=>safely(async()=>{const actions=Object.entries(DECISIONS).map(([k,v])=>({type:k.startsWith('candidate')?'candidate':'episode',id:k.startsWith('candidate')?k.slice(9):k.slice(7),approve:v==='approve'}));if(!actions.length)throw new Error('请勾选同意或拒绝');const edited=!!reviewData.input_payload?.messages?.some(m=>m.edited_for_experiment);if(!confirm(`确定逐条审核 ${actions.length} 项吗？这会更改正式记忆库或 Episode 审核状态，不能用此按钮撤销。${edited?'\n注意：这批样本中有人工修改过的原文，批准表示你已确认其真实性。':''}`))return;actions.forEach(x=>x.acknowledge_edited_source=edited);const results=await api('/api/reviews/bulk',{actions});text($('bulk-result'),results.map(x=>`${x.ok?'成功':'失败'} ${x.id}: ${x.ok?x.status:x.error}`).join('\n'));toast(`执行了 ${results.length} 项，成功 ${results.filter(x=>x.ok).length} 项`);await loadReview(CURRENT_RUN)});
+async function openDetail(kind,id){const box=$('detail-editor');box.replaceChildren();CURRENT_DETAIL={kind,id};const obj=await api(`/api/${kind==='candidate'?'candidate':'episode'}?id=${encodeURIComponent(id)}`);
+box.append(el('h3',{text:`${kind==='candidate'?'Cand':'Episode'} · ${id}`}));box.append(el('div',{class:'hint',text:`当前审核状态：${kind==='candidate'?obj.status:obj.review_status}。编辑实验提炼草稿不改变原始对话，也不修改模型原始输出。${obj.edited_after_model?'这条草稿已被人工修改，旧核验建议可能不再适用于新正文。':''}`}));
+function field(k,caption,value,kind='text'){const wrap=el('label',{text:caption});let input;if(kind==='textarea')input=el('textarea');else if(kind==='select'){input=el('select');for(const val of value.options)option(input,val,val);input.value=value.value}else input=el('input',{type:'text'});if(kind!=='select')input.value=value||'';input.dataset.field=k;wrap.append(input);box.append(wrap);return input}
+if(kind==='candidate'){
+field('content','长期记忆正文',obj.content,'textarea');field('category','category',{value:obj.category,options:['fact','preference','event','plan','relationship','self_expression','other']},'select');field('subject','subject',{value:obj.subject,options:['user','winefox','shared','world','other']},'select');field('fact_key','事实键（可留空）',obj.fact_key);field('importance','重要性 0～1',String(obj.importance));field('confidence','置信度 0～1',String(obj.confidence));
+box.append(el('div',{class:'hint',text:`证据来源：${obj.source_summary||obj.evidence_class} | `+(obj.audit_warnings||[]).join('；')}));if(obj.verification)box.append(el('details',{},[el('summary',{text:`第三阶段核验：${obj.verification.verdict}`}),el('pre',{text:JSON.stringify(obj.verification,null,2)})]));const evid=el('details',{},[el('summary',{text:`查看原始证据 ${obj.evidence_sources?.length||0} 条`}),el('pre',{text:(obj.evidence_sources||[]).map(r=>`[${r.kind}] ${r.role} ${r.id}\n${r.content}`).join('\n\n')})]);box.append(evid);
+const rep=field('replace_id','若批准时提示事实键冲突，填入需替换的 memdb_... ID','');rep.placeholder='只在明确确认覆盖旧事实时填写';
+}else{
+field('title','事件标题',obj.title);field('summary','短摘要',obj.summary,'textarea');field('detail','详细事件记录',obj.detail,'textarea');field('event_status','事件发生状态',{value:obj.event_status,options:['occurred','discussion','expression','uncertain']},'select');
+if(obj.audit_warnings?.length)box.append(el('div',{class:'danger-note small',text:obj.audit_warnings.join('；')}));if(obj.verification)box.append(el('details',{},[el('summary',{text:`第三阶段事件核验：${obj.verification.verdict}`}),el('pre',{text:JSON.stringify(obj.verification,null,2)})]));
+const plans=el('details',{},[el('summary',{text:`计划 ${obj.plans?.length||0} 条（可分别修改）`})]);for(const p of obj.plans||[]){const pArea=el('textarea');pArea.value=p.content;const pSelect=el('select');for(const v of ['proposed','planned','ongoing','completed','cancelled','uncertain'])option(pSelect,v,v);pSelect.value=p.status;plans.append(el('div',{class:'panel'},[el('div',{class:'item-meta',text:p.id}),pArea,pSelect,el('button',{text:'保存此计划',onclick:()=>safely(async()=>{await api('/api/plan/edit',{id:p.id,content:pArea.value,status:pSelect.value});toast('计划草稿保存成功')})})]))}box.append(plans);box.append(el('details',{},[el('summary',{text:`查看对应原始对话 ${obj.raw_dialogue?.length||0} 条`}),el('pre',{text:(obj.raw_dialogue||[]).map(r=>`${r.cited_as_evidence?'[证据]':'[背景]'} #${r.id} ${r.role||''}${r.edited_for_experiment?' [实验修改版]':''}\n${r.content||'<原文缺失>'}`).join('\n\n')})]));
+}
+const pending=['pending','auto_active'].includes(kind==='candidate'?obj.status:obj.review_status);const note=field('review_note','审核备注（可选）','');const btns=el('div',{class:'flex'});const save=el('button',{text:'只保存编辑，不审批',onclick:()=>safely(async()=>{const fields={};box.querySelectorAll('[data-field]').forEach(x=>{if(!['replace_id','review_note'].includes(x.dataset.field))fields[x.dataset.field]=x.value});if(!Object.keys(fields).length)throw new Error('没有可编辑字段');await api(`/api/${kind==='candidate'?'candidate':'episode'}/edit`,{id,fields});toast('编辑已保存，正式审核状态未改变');await loadReview(CURRENT_RUN);await openDetail(kind,id)})});btns.append(save);
+for(const [approve,title] of [[true,'保存并同意'],[false,'保存并拒绝']])btns.append(el('button',{class:approve?'primary':'warn',text:title,onclick:()=>safely(async()=>{const edited=!!reviewData.input_payload?.messages?.some(m=>m.edited_for_experiment);if(approve&&edited&&!confirm('实验样本包含人工修改过的原文。你已核对修改的真实性，并确定将这条结果写入正式记忆吗？'))return;const fields={};box.querySelectorAll('[data-field]').forEach(x=>{if(!['replace_id','review_note'].includes(x.dataset.field))fields[x.dataset.field]=x.value});await api(`/api/${kind==='candidate'?'candidate':'episode'}/edit`,{id,fields});const result=await api(`/api/${kind==='candidate'?'candidate':'episode'}/review`,{id,approve,note:note.value,replace_id:kind==='candidate'?(rep.value.trim()||null):undefined,acknowledge_edited_source:edited});toast(`审核完成：${id}`);await loadReview(CURRENT_RUN)})}));
+if(!pending){btns.querySelectorAll('button').forEach(b=>b.disabled=true);box.append(el('div',{class:'hint',text:'已审核记录不可重复审批；原始模型输出仍保留用于实验对照。'}))}box.append(btns);
+}
+async function refreshLibrary(){const [mem,plans]=await Promise.all([api('/api/memories'),api('/api/plans')]);const list=$('memory-list');list.replaceChildren();for(const m of mem)list.append(el('div',{class:'item'},[el('div',{class:'preview',text:m.content}),el('div',{class:'item-meta',text:`${m.id} · ${m.category} · ${m.temporal_validity||'unresolved'}`})]));const p=$('plan-list');p.replaceChildren();for(const item of plans){const sel=el('select');for(const v of ['proposed','planned','ongoing','completed','cancelled','uncertain'])option(sel,v,v);sel.value=item.status;const reason=el('input',{placeholder:'状态变更依据（必填）'});p.append(el('div',{class:'item'},[el('div',{class:'preview',text:item.content}),el('div',{class:'item-meta',text:`${item.episode_title} · ${item.id}`}),el('div',{class:'flex'},[sel,reason,el('button',{text:'更新计划状态',onclick:()=>safely(async()=>{await api('/api/plan/update',{id:item.id,status:sel.value,note:reason.value});toast('计划状态已更新并写入历史');await refreshLibrary()})})])]))}}
+$('refresh-library').onclick=()=>safely(refreshLibrary);$('recall').onclick=()=>safely(async()=>{const r=await api('/api/recall',{question:$('recall-q').value,level:$('recall-level').value});text($('recall-result'),JSON.stringify(r,null,2))});
+
+const RETRIEVAL_LABELS={
+ enabled:'启用召回',max_input_tokens:'总输入上限（估算 Tokens）',memory_budget_tokens:'长期记忆预算',
+ core_budget_tokens:'Core 预算',directory_budget_tokens:'目录卡预算',detail_budget_tokens:'详情预算',
+ episode_cards_target:'目标目录卡数',episode_cards_max:'目录卡最大数',episode_detail_max:'最多展开事件',cand_limit:'最多短事实',
+ semantic_weight:'相关性权重',recency_weight:'近期性权重',importance_weight:'重要性权重',mention_weight:'谈及次数权重',
+ spontaneous_recall_probability:'随机联想概率',recall_cooldown_turns:'随机回忆冷却轮次',
+ session_activation_turns:'会话激活持续轮次',semantic_backend:'语义后端',embedding_model:'本地 Embedding 模型',
+ raw_excerpt_limit:'原话类查询的最多证据条数',query_instruction:'语义检索 Query 前缀（可留空）',
+ core_auto_enabled:'自动 Core（开启后审批将可能调用付费 API）',core_auto_min_new:'至少新增批准条数',
+ core_auto_batch_limit:'每次整理最多新增来源',core_auto_max_items:'AI Core 最多条目',
+ core_auto_text_budget_tokens:'AI Core 独立长度预算'
+};
+let CURRENT_RETRIEVAL_SETTINGS={};
+async function loadRetrievalSettings(){
+ const cfg=await api('/api/retrieval/settings');CURRENT_RETRIEVAL_SETTINGS=cfg;
+ const box=$('recall-settings');box.replaceChildren();
+ for(const [key,value] of Object.entries(cfg)){
+   const label=el('label',{text:RETRIEVAL_LABELS[key]||key});let field;
+   if(typeof value==='boolean')field=el('input',{type:'checkbox',checked:value});
+   else if(key==='semantic_backend') {field=el('select');for(const v of ['auto','lexical','sentence_transformers'])option(field,v,v);field.value=value}
+   else if(typeof value==='number'){field=el('input',{type:'number'});field.step=Number.isInteger(value)?'1':'0.01';field.value=String(value)}
+   else {field=el('input',{type:'text'});field.value=value}
+   field.dataset.retrieveKey=key;label.append(field);box.append(label);
+ }
+}
+$('retrieval-settings-load').onclick=()=>safely(loadRetrievalSettings);
+$('retrieval-settings-save').onclick=()=>safely(async()=>{
+ const changes={};for(const f of document.querySelectorAll('[data-retrieve-key]')){
+    const key=f.dataset.retrieveKey,old=CURRENT_RETRIEVAL_SETTINGS[key];
+    changes[key]=typeof old==='boolean'?f.checked:typeof old==='number'?Number(f.value):f.value;
+ }
+ await api('/api/retrieval/settings',{changes});toast('召回参数已保存');await loadRetrievalSettings();
+});
+async function loadCore(){const result=await api('/api/retrieval/core');
+ $('retrieval-core-text').value=result.manual_content??result.content;
+ text($('retrieval-core-origin'),'当前内容来自：'+result.source);
+ const list=$('retrieval-core-versions');list.replaceChildren();for(const v of result.versions)option(list,v,v);
+}
+$('retrieval-core-load').onclick=()=>safely(loadCore);
+$('retrieval-core-save').onclick=()=>safely(async()=>{if(!confirm('确认保存当前 Core Memory？原有内容会进入版本备份。'))return;
+ const result=await api('/api/retrieval/core',{content:$('retrieval-core-text').value});toast('Core 已保存');await loadCore()});
+$('retrieval-core-restore').onclick=()=>safely(async()=>{
+ const version=$('retrieval-core-versions').value;if(!version)throw new Error('没有旧版可恢复');
+ if(!confirm('恢复历史版本 '+version+'？当前版本仍会备份。'))return;
+ await api('/api/retrieval/core/restore',{version});toast('已恢复');await loadCore()});
+async function loadCoreAuto(){
+ const view=await api('/api/core-auto/preview');
+ text($('core-auto-info'),JSON.stringify({enabled:view.enabled,pending_count:view.pending_count,
+  min_new:view.min_new,approved_count:view.approved_count,pending:view.pending,model_hint:view.model_hint},null,2));
+ const box=$('core-auto-entries');box.replaceChildren();for(const e of view.entries){
+   box.append(el('div',{class:'item'},[el('div',{class:'preview',text:e.text}),
+     el('div',{class:'item-meta',text:'证据：'+e.source_ids.join(', ')+' | '+(e.reason||'')})]))
+ }
+ if(!view.entries.length)box.append(el('div',{class:'hint',text:'AI 尚未生成 Core 条目；已有手工 Core 不受影响。'}));
+}
+$('core-auto-preview').onclick=()=>safely(loadCoreAuto);
+$('core-auto-run').onclick=()=>safely(async()=>{
+ if(!confirm('确认调用 Core 整理模型？只处理新增已批准记忆，一次调用会产生 API 费用；结果自动应用并可回退。'))return;
+ const result=await api('/api/core-auto/run',{force:true});
+ if(result.status==='already_running'){toast('已有 Core 整理任务运行中');return}
+ if(result.job_id){text($('core-auto-job'),'任务 '+result.job_id+' 正在运行，错误将写入日志。');
+   const job=result.job_id;
+   for(let n=0;n<240;n++){
+     await new Promise(resolve=>setTimeout(resolve,1500));
+     const v=await api('/api/core-auto/job?id='+encodeURIComponent(job));
+     text($('core-auto-job'),JSON.stringify(v,null,2));
+     if(!['queued','running'].includes(v.status)){
+       await loadCoreAuto();await loadCore();await loadCoreAutoHistory();
+       toast('Core 整理状态：'+v.status);return;
+     }
+   }
+   toast('任务仍在执行，可稍后刷新历史；关闭页面不影响本地任务。');
+ }
+});
+async function loadCoreAutoHistory(){const list=await api('/api/core-auto/history');
+ const box=$('core-auto-history');box.replaceChildren();for(const r of list){
+   const btn=el('button',{text:'恢复此运行前快照',onclick:()=>safely(async()=>{
+     if(!confirm('确认恢复 '+r.id+' 的 BEFORE 快照？不会修改原文/已批准记忆，也不会回滚待处理标记。'))return;
+     await api('/api/core-auto/restore',{id:r.id,snapshot:'before'});toast('已恢复 AI Core');await loadCoreAuto();await loadCore();
+   })});
+   box.append(el('div',{class:'item'},[el('div',{class:'item-head'},[
+      el('span',{class:'item-title',text:r.id+' · '+r.status}),
+      el('span',{class:'pill',text:r.model||'—'})]),
+      el('div',{class:'item-meta',text:r.started_at+'  · 来源 '+r.sources_count+' 条 · 条目 '+r.after_count}),
+      el('div',{class:'hint',text:r.error||''}),btn]));
+ }
+}
+$('core-auto-history-load').onclick=()=>safely(loadCoreAutoHistory);
+$('retrieval-embedding-status').onclick=()=>safely(async()=>{
+ text($('retrieval-embedding-info'),JSON.stringify(await api('/api/retrieval/embedding'),null,2));
+});
+$('retrieval-preview').onclick=()=>safely(async()=>{
+ const preview=await api('/api/retrieval/preview',{question:$('retrieval-preview-q').value,seed:Number($('retrieval-preview-seed').value)});
+ const summary={backend:preview.backend,estimated_tokens:preview.estimated_tokens, estimated_total_input_tokens:preview.estimated_total_input_tokens, recent_messages_injected:preview.recent_messages_injected,
+   memory_budget_tokens:preview.memory_budget_tokens,
+   core_source:preview.core_source,spontaneous:preview.spontaneous,seed:preview.seed,
+   cand:preview.cand,cards:preview.cards,details:preview.details,selected:preview.selected};
+ text($('retrieval-preview-info'),JSON.stringify(summary,null,2));
+ text($('retrieval-preview-body'),(preview.core_text?'Core:\n'+preview.core_text+'\n\n':'')+preview.memory_text);
+});
+async function loadRetrievalLogs(){const logs=await api('/api/retrieval/logs');text($('retrieval-logs'),JSON.stringify(logs,null,2))}
+$('retrieval-logs-load').onclick=()=>safely(loadRetrievalLogs);
+
+let RETRIEVAL_APPROVED_ITEMS=[];
+async function loadRetrievalItems(){RETRIEVAL_APPROVED_ITEMS=await api('/api/retrieval/items');renderRetrievalItems()}
+function renderRetrievalItems(){
+ const query=$('retrieval-item-filter').value.trim().toLowerCase(),box=$('retrieval-item-list');box.replaceChildren();
+ const list=RETRIEVAL_APPROVED_ITEMS.filter(e=>(e.title+' '+e.preview+' '+e.id).toLowerCase().includes(query));
+ for(const e of list.slice(-120).reverse()){
+  const checked=el('input',{type:'checkbox',checked:!!e.pinned});
+  const importance=el('input',{type:'number'});importance.min=0;importance.max=1;importance.step=.05;
+  importance.value=e.importance_override??'';importance.placeholder=String(e.importance);
+  const update=el('button',{text:'保存',onclick:()=>safely(async()=>{
+   const raw=importance.value.trim();const saved=await api('/api/retrieval/metadata',{kind:e.kind,id:e.id,pinned:checked.checked,importance_override:raw===''?null:Number(raw)});
+   e.pinned=saved.pinned;e.importance_override=saved.importance_override;toast('已保存 '+e.id);
+  })});
+  box.append(el('div',{class:'item'},[el('div',{class:'item-head'},[el('span',{class:'pill',text:e.kind}),el('span',{class:'item-title',text:e.title})]),
+   el('div',{class:'preview',text:e.preview}),el('div',{class:'flex'},[
+    el('label',{},[checked,' Pinned']),el('label',{},['显著性覆盖（可留空） ',importance]),update])]))
+ }
+ if(!list.length)box.append(el('div',{class:'hint',text:'无匹配条目（可能尚未批准任何 Cand/Episode）'}));
+}
+$('retrieval-item-filter').oninput=renderRetrievalItems;
+$('retrieval-item-refresh').onclick=()=>safely(loadRetrievalItems);
+
+$('meta-load').onclick=()=>safely(async()=>{const x=await api('/api/retrieval/metadata?kind='+encodeURIComponent($('meta-kind').value)+'&id='+encodeURIComponent($('meta-id').value));
+ $('meta-pinned').checked=!!x.pinned;$('meta-importance').value=x.importance_override??'';text($('meta-result'),JSON.stringify(x,null,2))});
+$('meta-save').onclick=()=>safely(async()=>{const raw=$('meta-importance').value.trim();const x=await api('/api/retrieval/metadata',{
+ kind:$('meta-kind').value,id:$('meta-id').value,pinned:$('meta-pinned').checked,importance_override:raw===''?null:Number(raw)});
+ text($('meta-result'),JSON.stringify(x,null,2));toast('记忆属性已保存')});
+
+safely(bootstrap);
+</script></body></html>

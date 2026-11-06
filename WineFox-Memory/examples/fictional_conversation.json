@@ -1,0 +1,8 @@
+[
+  {"role": "user", "content": "今天我们去虚构的蓝石博物馆参观了。"},
+  {"role": "assistant", "content": "我记得馆里有一具很大的恐龙化石。"},
+  {"role": "user", "content": "以后我们还想去看海洋馆，不过暂时还没买票。"},
+  {"role": "assistant", "content": "那我们先记下这个计划，等确定日期再去。"},
+  {"role": "user", "content": "我特别喜欢博物馆里的地球科学展区。"},
+  {"role": "assistant", "content": "好的，下次聊博物馆就可以提到这次喜欢的展区。"}
+]
